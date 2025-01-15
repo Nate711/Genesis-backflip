@@ -525,7 +525,7 @@ class LocoEnv:
                 self.link_contact_forces[:, self.termination_contact_link_indices, :],
                 dim=-1,
             )
-            > 1.0,
+            > 100000.0,
             dim=1,
         )
         self.time_out_buf = (

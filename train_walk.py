@@ -123,7 +123,7 @@ def get_cfgs():
         "episode_length_s": 20.0,
         "resampling_time_s": 4.0,
         "command_type": "ang_vel_yaw",  # 'ang_vel_yaw' or 'heading'
-        "action_scale": 0.25,
+        "action_scale": 1.5,
         "action_latency": 0.02,
         "clip_actions": 100.0,
         "send_timeouts": True,
