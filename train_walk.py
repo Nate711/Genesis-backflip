@@ -110,8 +110,8 @@ def get_cfgs():
         "PD_damping": {"joint": 1.5},
         "use_implicit_controller": True,
         # termination
-        "termination_if_roll_greater_than": 0.4,
-        "termination_if_pitch_greater_than": 0.4,
+        "termination_if_roll_greater_than": 1.2,
+        "termination_if_pitch_greater_than": 1.2,
         "termination_if_height_lower_than": 0.0,
         # base pose
         "base_init_pos": [12.0, 12.0, 0.42],  # use 12 if using terrain

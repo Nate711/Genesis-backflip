@@ -520,18 +520,18 @@ class LocoEnv:
         return target_dof_pos
 
     def check_termination(self):
-        self.reset_buf = torch.any(
-            torch.norm(
-                self.link_contact_forces[:, self.termination_contact_link_indices, :],
-                dim=-1,
-            )
-            > 100000.0,
-            dim=1,
-        )
+        # self.reset_buf = torch.any(
+        #     torch.norm(
+        #         self.link_contact_forces[:, self.termination_contact_link_indices, :],
+        #         dim=-1,
+        #     )
+        #     > 100000.0,
+        #     dim=1,
+        # )
         self.time_out_buf = (
             self.episode_length_buf > self.max_episode_length
         )  # no terminal reward for time-outs
-        self.reset_buf |= torch.logical_or(
+        self.reset_buf = torch.logical_or(
             torch.abs(self.base_euler[:, 1])
             > self.env_cfg["termination_if_pitch_greater_than"],
             torch.abs(self.base_euler[:, 0])
