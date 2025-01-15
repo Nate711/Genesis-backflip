@@ -6,6 +6,7 @@ import genesis as gs
 from genesis.engine.solvers.rigid.rigid_solver_decomp import RigidSolver
 from utils import *
 
+
 class LocoEnv:
     def __init__(
         self,
@@ -17,48 +18,48 @@ class LocoEnv:
         show_viewer,
         eval,
         debug,
-        device='cuda',
+        device="cuda",
     ) -> None:
         self.num_envs = 1 if num_envs == 0 else num_envs
         self.num_build_envs = num_envs
-        self.num_single_obs = obs_cfg['num_obs']
-        self.num_obs = self.num_single_obs * obs_cfg['num_history_obs']
-        self.num_privileged_obs = obs_cfg['num_priv_obs']
-        self.num_actions = env_cfg['num_actions']
-        self.num_commands = command_cfg['num_commands']
+        self.num_single_obs = obs_cfg["num_obs"]
+        self.num_obs = self.num_single_obs * obs_cfg["num_history_obs"]
+        self.num_privileged_obs = obs_cfg["num_priv_obs"]
+        self.num_actions = env_cfg["num_actions"]
+        self.num_commands = command_cfg["num_commands"]
 
         self.headless = not show_viewer
         self.eval = eval
         self.debug = debug
 
-        self.dt = 1 / env_cfg['control_freq']
-        if env_cfg['use_implicit_controller']:
+        self.dt = 1 / env_cfg["control_freq"]
+        if env_cfg["use_implicit_controller"]:
             sim_dt = self.dt
-            sim_substeps = env_cfg['decimation']
+            sim_substeps = env_cfg["decimation"]
         else:
-            sim_dt = self.dt / env_cfg['decimation']
+            sim_dt = self.dt / env_cfg["decimation"]
             sim_substeps = 1
-        self.max_episode_length_s = env_cfg['episode_length_s']
+        self.max_episode_length_s = env_cfg["episode_length_s"]
         self.max_episode_length = np.ceil(self.max_episode_length_s / self.dt)
 
         self.obs_cfg = obs_cfg
-        self.obs_scales = obs_cfg['obs_scales']
+        self.obs_scales = obs_cfg["obs_scales"]
         self.reward_cfg = reward_cfg
-        self.reward_scales = reward_cfg['reward_scales']
+        self.reward_scales = reward_cfg["reward_scales"]
         self.env_cfg = env_cfg
         self.command_cfg = command_cfg
 
-        self.command_type = env_cfg['command_type']
-        assert self.command_type in ['heading', 'ang_vel_yaw']
+        self.command_type = env_cfg["command_type"]
+        assert self.command_type in ["heading", "ang_vel_yaw"]
 
-        self.action_latency = env_cfg['action_latency']
+        self.action_latency = env_cfg["action_latency"]
         assert self.action_latency in [0, 0.02]
 
-        self.num_dof = env_cfg['num_dofs']
+        self.num_dof = env_cfg["num_dofs"]
         if not torch.cuda.is_available():
-            self.device = torch.device('cpu')
+            self.device = torch.device("cpu")
         else:
-            assert device in ['cpu', 'cuda']
+            assert device in ["cpu", "cuda"]
             self.device = torch.device(device)
 
         # create scene
@@ -68,7 +69,7 @@ class LocoEnv:
                 substeps=sim_substeps,
             ),
             viewer_options=gs.options.ViewerOptions(
-                max_FPS=int(1 / self.dt * self.env_cfg['decimation']),
+                max_FPS=int(1 / self.dt * self.env_cfg["decimation"]),
                 camera_pos=(2.0, 0.0, 2.5),
                 camera_lookat=(0.0, 0.0, 0.5),
                 camera_fov=40,
@@ -93,49 +94,59 @@ class LocoEnv:
             self.rigid_solver = solver
 
         # add entities
-        if self.env_cfg['use_terrain']:
-            self.terrain_cfg = self.env_cfg['terrain_cfg']
+        if self.env_cfg["use_terrain"]:
+            self.terrain_cfg = self.env_cfg["terrain_cfg"]
             self.terrain = self.scene.add_entity(
                 gs.morphs.Terrain(
-                    n_subterrains=self.terrain_cfg['n_subterrains'],
-                    horizontal_scale=self.terrain_cfg['horizontal_scale'],
-                    vertical_scale=self.terrain_cfg['vertical_scale'],
-                    subterrain_size=self.terrain_cfg['subterrain_size'],
-                    subterrain_types=self.terrain_cfg['subterrain_types'],
+                    # pos=(-12.0, -12.0, 0.0),
+                    n_subterrains=self.terrain_cfg["n_subterrains"],
+                    horizontal_scale=self.terrain_cfg["horizontal_scale"],
+                    vertical_scale=self.terrain_cfg["vertical_scale"],
+                    subterrain_size=self.terrain_cfg["subterrain_size"],
+                    subterrain_types=self.terrain_cfg["subterrain_types"],
                 ),
             )
-            terrain_margin_x = self.terrain_cfg['n_subterrains'][0] * self.terrain_cfg['subterrain_size'][0]
-            terrain_margin_y = self.terrain_cfg['n_subterrains'][1] * self.terrain_cfg['subterrain_size'][1]
+            terrain_margin_x = (
+                self.terrain_cfg["n_subterrains"][0]
+                * self.terrain_cfg["subterrain_size"][0]
+            )
+            terrain_margin_y = (
+                self.terrain_cfg["n_subterrains"][1]
+                * self.terrain_cfg["subterrain_size"][1]
+            )
             self.terrain_margin = torch.tensor(
-                [terrain_margin_x, terrain_margin_y], device=self.device, dtype=gs.tc_float
+                [terrain_margin_x, terrain_margin_y],
+                device=self.device,
+                dtype=gs.tc_float,
             )
             height_field = self.terrain.geoms[0].metadata["height_field"]
-            self.height_field = torch.tensor(
-                height_field, device=self.device, dtype=gs.tc_float
-            ) * self.terrain_cfg['vertical_scale']
+            self.height_field = (
+                torch.tensor(height_field, device=self.device, dtype=gs.tc_float)
+                * self.terrain_cfg["vertical_scale"]
+            )
         else:
             self.scene.add_entity(
-            gs.morphs.URDF(file='urdf/plane/plane.urdf', fixed=True),
-        )
+                gs.morphs.URDF(file="urdf/plane/plane.urdf", fixed=True),
+            )
         self.base_init_pos = torch.tensor(
-            self.env_cfg['base_init_pos'], device=self.device
+            self.env_cfg["base_init_pos"], device=self.device
         )
         self.base_init_quat = torch.tensor(
-            self.env_cfg['base_init_quat'], device=self.device
+            self.env_cfg["base_init_quat"], device=self.device
         )
 
         self.robot = self.scene.add_entity(
             gs.morphs.URDF(
-                file=self.env_cfg['urdf_path'],
+                file=self.env_cfg["urdf_path"],
                 merge_fixed_links=True,
-                links_to_keep=self.env_cfg['links_to_keep'],
+                links_to_keep=self.env_cfg["links_to_keep"],
                 pos=self.base_init_pos.cpu().numpy(),
                 quat=self.base_init_quat.cpu().numpy(),
             ),
             visualize_contact=self.debug,
         )
 
-        if gs.platform != 'macOS':
+        if gs.platform != "macOS":
             self._set_camera()
 
         # build
@@ -161,10 +172,10 @@ class LocoEnv:
         self.reward_functions = []
         self.reward_names = []
         for name, scale in self.reward_scales.items():
-            if name == 'termination':
+            if name == "termination":
                 continue
             self.reward_names.append(name)
-            name = '_reward_' + name
+            name = "_reward_" + name
             self.reward_functions.append(getattr(self, name))
 
         # reward episode sums
@@ -238,9 +249,9 @@ class LocoEnv:
         )
         self.commands_scale = torch.tensor(
             [
-                self.obs_scales['lin_vel'],
-                self.obs_scales['lin_vel'],
-                self.obs_scales['ang_vel'],
+                self.obs_scales["lin_vel"],
+                self.obs_scales["lin_vel"],
+                self.obs_scales["ang_vel"],
             ],
             device=self.device,
             dtype=gs.tc_float,
@@ -252,7 +263,7 @@ class LocoEnv:
         # names to indices
         self.motor_dofs = [
             self.robot.get_joint(name).dof_idx_local
-            for name in self.env_cfg['dof_names']
+            for name in self.env_cfg["dof_names"]
         ]
 
         def find_link_indices(names):
@@ -267,18 +278,16 @@ class LocoEnv:
             return link_indices
 
         self.termination_contact_link_indices = find_link_indices(
-            self.env_cfg['termination_contact_link_names']
+            self.env_cfg["termination_contact_link_names"]
         )
         self.penalized_contact_link_indices = find_link_indices(
-            self.env_cfg['penalized_contact_link_names']
+            self.env_cfg["penalized_contact_link_names"]
         )
-        self.feet_link_indices = find_link_indices(
-            self.env_cfg['feet_link_names']
-        )
+        self.feet_link_indices = find_link_indices(self.env_cfg["feet_link_names"])
         assert len(self.termination_contact_link_indices) > 0
         assert len(self.penalized_contact_link_indices) > 0
         assert len(self.feet_link_indices) > 0
-        self.feet_link_indices_world_frame = [i+1 for i in self.feet_link_indices]
+        self.feet_link_indices_world_frame = [i + 1 for i in self.feet_link_indices]
 
         # actions
         self.actions = torch.zeros(
@@ -312,7 +321,9 @@ class LocoEnv:
             (self.num_envs, 4), device=self.device, dtype=gs.tc_float
         )
         self.link_contact_forces = torch.zeros(
-            (self.num_envs, self.robot.n_links, 3), device=self.device, dtype=gs.tc_float
+            (self.num_envs, self.robot.n_links, 3),
+            device=self.device,
+            dtype=gs.tc_float,
         )
 
         self.feet_air_time = torch.zeros(
@@ -339,7 +350,7 @@ class LocoEnv:
         self.env_identities = torch.arange(
             self.num_envs,
             device=self.device,
-            dtype=gs.tc_int, 
+            dtype=gs.tc_int,
         )
         self.common_step_counter = 0
         self.extras = {}
@@ -351,11 +362,11 @@ class LocoEnv:
         )
 
         # PD control
-        stiffness = self.env_cfg['PD_stiffness']
-        damping = self.env_cfg['PD_damping']
+        stiffness = self.env_cfg["PD_stiffness"]
+        damping = self.env_cfg["PD_damping"]
 
         self.p_gains, self.d_gains = [], []
-        for dof_name in self.env_cfg['dof_names']:
+        for dof_name in self.env_cfg["dof_names"]:
             for key in stiffness.keys():
                 if key in dof_name:
                     self.p_gains.append(stiffness[key])
@@ -368,23 +379,25 @@ class LocoEnv:
         self.robot.set_dofs_kp(self.p_gains, self.motor_dofs)
         self.robot.set_dofs_kv(self.d_gains, self.motor_dofs)
 
-        default_joint_angles = self.env_cfg['default_joint_angles']
+        default_joint_angles = self.env_cfg["default_joint_angles"]
         self.default_dof_pos = torch.tensor(
-            [default_joint_angles[name] for name in self.env_cfg['dof_names']],
+            [default_joint_angles[name] for name in self.env_cfg["dof_names"]],
             device=self.device,
         )
 
-        self.dof_pos_limits = torch.stack(self.robot.get_dofs_limit(self.motor_dofs), dim=1)
+        self.dof_pos_limits = torch.stack(
+            self.robot.get_dofs_limit(self.motor_dofs), dim=1
+        )
         self.torque_limits = self.robot.get_dofs_force_range(self.motor_dofs)[1]
         for i in range(self.dof_pos_limits.shape[0]):
             # soft limits
             m = (self.dof_pos_limits[i, 0] + self.dof_pos_limits[i, 1]) / 2
             r = self.dof_pos_limits[i, 1] - self.dof_pos_limits[i, 0]
             self.dof_pos_limits[i, 0] = (
-                m - 0.5 * r * self.reward_cfg['soft_dof_pos_limit']
+                m - 0.5 * r * self.reward_cfg["soft_dof_pos_limit"]
             )
             self.dof_pos_limits[i, 1] = (
-                m + 0.5 * r * self.reward_cfg['soft_dof_pos_limit']
+                m + 0.5 * r * self.reward_cfg["soft_dof_pos_limit"]
             )
 
         self.motor_strengths = gs.ones((self.num_envs, self.num_dof), dtype=float)
@@ -392,32 +405,52 @@ class LocoEnv:
 
         # gait control
         self.foot_positions = torch.ones(
-            self.num_envs, len(self.feet_link_indices), 3, device=self.device, dtype=gs.tc_float,
+            self.num_envs,
+            len(self.feet_link_indices),
+            3,
+            device=self.device,
+            dtype=gs.tc_float,
         )
         self.foot_quaternions = torch.ones(
-            self.num_envs, len(self.feet_link_indices), 4, device=self.device, dtype=gs.tc_float,
+            self.num_envs,
+            len(self.feet_link_indices),
+            4,
+            device=self.device,
+            dtype=gs.tc_float,
         )
         self.foot_velocities = torch.ones(
-            self.num_envs, len(self.feet_link_indices), 3, device=self.device, dtype=gs.tc_float,
+            self.num_envs,
+            len(self.feet_link_indices),
+            3,
+            device=self.device,
+            dtype=gs.tc_float,
         )
 
         self.base_link_index = 1
 
         self.com = torch.zeros(
-            self.num_envs, 3, device=self.device, dtype=gs.tc_float,
+            self.num_envs,
+            3,
+            device=self.device,
+            dtype=gs.tc_float,
         )
 
     def _update_buffers(self):
-        
+
         # update buffers
         # [:] is for non-parallelized scene
         self.base_pos[:] = self.robot.get_pos()
         self.base_quat[:] = self.robot.get_quat()
-        base_quat_rel = gs_quat_mul(self.base_quat, gs_inv_quat(self.base_init_quat.reshape(1, -1).repeat(self.num_envs, 1)))
+        base_quat_rel = gs_quat_mul(
+            self.base_quat,
+            gs_inv_quat(self.base_init_quat.reshape(1, -1).repeat(self.num_envs, 1)),
+        )
         self.base_euler = gs_quat2euler(base_quat_rel)
 
-        inv_quat_yaw = gs_quat_from_angle_axis(-self.base_euler[:, 2],
-                                               torch.tensor([0, 0, 1], device=self.device, dtype=torch.float))
+        inv_quat_yaw = gs_quat_from_angle_axis(
+            -self.base_euler[:, 2],
+            torch.tensor([0, 0, 1], device=self.device, dtype=torch.float),
+        )
 
         inv_base_quat = gs_inv_quat(self.base_quat)
         self.base_lin_vel[:] = gs_transform_by_quat(self.robot.get_vel(), inv_quat_yaw)
@@ -433,31 +466,55 @@ class LocoEnv:
             device=self.device,
             dtype=gs.tc_float,
         )
-        self.com[:] = self.rigid_solver.get_links_COM([self.base_link_index,]).squeeze(dim=1)
+        self.com[:] = self.rigid_solver.get_links_COM(
+            [
+                self.base_link_index,
+            ]
+        ).squeeze(dim=1)
 
-        self.foot_positions[:] = self.rigid_solver.get_links_pos(self.feet_link_indices_world_frame)
-        self.foot_quaternions[:] = self.rigid_solver.get_links_quat(self.feet_link_indices_world_frame)
-        self.foot_velocities[:] = self.rigid_solver.get_links_vel(self.feet_link_indices_world_frame)
+        self.foot_positions[:] = self.rigid_solver.get_links_pos(
+            self.feet_link_indices_world_frame
+        )
+        self.foot_quaternions[:] = self.rigid_solver.get_links_quat(
+            self.feet_link_indices_world_frame
+        )
+        self.foot_velocities[:] = self.rigid_solver.get_links_vel(
+            self.feet_link_indices_world_frame
+        )
 
-        if self.env_cfg['use_terrain']:
-            clipped_base_pos = self.base_pos[:, :2].clamp(min=torch.zeros(2, device=self.device), max=self.terrain_margin)
-            height_field_ids = (clipped_base_pos / self.terrain_cfg['horizontal_scale'] - 0.5).floor().int()
+        if self.env_cfg["use_terrain"]:
+            clipped_base_pos = self.base_pos[:, :2].clamp(
+                min=torch.zeros(2, device=self.device), max=self.terrain_margin
+            )
+            height_field_ids = (
+                (clipped_base_pos / self.terrain_cfg["horizontal_scale"] - 0.5)
+                .floor()
+                .int()
+            )
             height_field_ids.clamp(min=0)
             # print(self.height_field[height_field_ids[:, 0], height_field_ids[:, 1]])
-            self.terrain_heights = self.height_field[height_field_ids[:, 0], height_field_ids[:, 1]]
+            self.terrain_heights = self.height_field[
+                height_field_ids[:, 0], height_field_ids[:, 1]
+            ]
 
     def _compute_torques(self, actions):
         # control_type = 'P'
-        actions_scaled = actions * self.env_cfg['action_scale']
+        actions_scaled = actions * self.env_cfg["action_scale"]
         torques = (
-            self.batched_p_gains * (actions_scaled + self.default_dof_pos - self.dof_pos + self.motor_offsets)
+            self.batched_p_gains
+            * (
+                actions_scaled
+                + self.default_dof_pos
+                - self.dof_pos
+                + self.motor_offsets
+            )
             - self.batched_d_gains * self.dof_vel
         )
         return torques * self.motor_strengths
 
     def _compute_target_dof_pos(self, actions):
         # control_type = 'P'
-        actions_scaled = actions * self.env_cfg['action_scale']
+        actions_scaled = actions * self.env_cfg["action_scale"]
         target_dof_pos = actions_scaled + self.default_dof_pos
 
         return target_dof_pos
@@ -476,11 +533,11 @@ class LocoEnv:
         )  # no terminal reward for time-outs
         self.reset_buf |= torch.logical_or(
             torch.abs(self.base_euler[:, 1])
-            > self.env_cfg['termination_if_pitch_greater_than'],
+            > self.env_cfg["termination_if_pitch_greater_than"],
             torch.abs(self.base_euler[:, 0])
-            > self.env_cfg['termination_if_roll_greater_than'],
+            > self.env_cfg["termination_if_roll_greater_than"],
         )
-        if self.env_cfg['use_terrain']:
+        if self.env_cfg["use_terrain"]:
             self.reset_buf |= torch.logical_or(
                 self.base_pos[:, 0] > self.terrain_margin[0],
                 self.base_pos[:, 1] > self.terrain_margin[1],
@@ -489,21 +546,23 @@ class LocoEnv:
                 self.base_pos[:, 0] < 1,
                 self.base_pos[:, 1] < 1,
             )
-        self.reset_buf |= self.base_pos[:, 2] < self.env_cfg['termination_if_height_lower_than']
+        self.reset_buf |= (
+            self.base_pos[:, 2] < self.env_cfg["termination_if_height_lower_than"]
+        )
         self.reset_buf |= self.time_out_buf
 
     def compute_reward(self):
-        self.rew_buf[:] = 0.
+        self.rew_buf[:] = 0.0
         for i in range(len(self.reward_functions)):
             name = self.reward_names[i]
             rew = self.reward_functions[i]() * self.reward_scales[name]
             self.rew_buf += rew
             self.episode_sums[name] += rew
         # add termination reward after clipping
-        if 'termination' in self.reward_scales:
-            rew = self._reward_termination() * self.reward_scales['termination']
+        if "termination" in self.reward_scales:
+            rew = self._reward_termination() * self.reward_scales["termination"]
             self.rew_buf += rew
-            self.episode_sums['termination'] += rew
+            self.episode_sums["termination"] += rew
 
     def get_observations(self):
         return self.obs_history_buf
@@ -517,7 +576,7 @@ class LocoEnv:
 
         self._update_buffers()
 
-        resampling_time_s = self.env_cfg['resampling_time_s']
+        resampling_time_s = self.env_cfg["resampling_time_s"]
         envs_idx = (
             (self.episode_length_buf % int(resampling_time_s / self.dt) == 0)
             .nonzero(as_tuple=False)
@@ -526,7 +585,7 @@ class LocoEnv:
         self._resample_commands(envs_idx)
         self._randomize_rigids(envs_idx)
         self._randomize_controls(envs_idx)
-        if self.command_type == 'heading':
+        if self.command_type == "heading":
             forward = gs_transform_by_quat(self.forward_vec, self.base_quat)
             heading = torch.atan2(forward[:, 1], forward[:, 0])
             self.commands[:, 2] = torch.clip(
@@ -534,12 +593,22 @@ class LocoEnv:
             )
 
         # random push
-        push_interval_s = self.env_cfg['push_interval_s']
+        push_interval_s = self.env_cfg["push_interval_s"]
         if push_interval_s > 0 and not (self.debug or self.eval):
-            max_push_vel_xy = self.env_cfg['max_push_vel_xy']
-            dofs_vel = self.robot.get_dofs_velocity() # (num_envs, num_dof) [0:3] ~ base_link_vel
-            push_vel = gs_rand_float(-max_push_vel_xy, max_push_vel_xy, (self.num_envs, 2), self.device)
-            push_vel[((self.common_step_counter + self.env_identities) % int(push_interval_s / self.dt) != 0)] = 0
+            max_push_vel_xy = self.env_cfg["max_push_vel_xy"]
+            dofs_vel = (
+                self.robot.get_dofs_velocity()
+            )  # (num_envs, num_dof) [0:3] ~ base_link_vel
+            push_vel = gs_rand_float(
+                -max_push_vel_xy, max_push_vel_xy, (self.num_envs, 2), self.device
+            )
+            push_vel[
+                (
+                    (self.common_step_counter + self.env_identities)
+                    % int(push_interval_s / self.dt)
+                    != 0
+                )
+            ] = 0
             dofs_vel[:, :2] += push_vel
             self.robot.set_dofs_velocity(dofs_vel)
 
@@ -552,7 +621,7 @@ class LocoEnv:
         # self.rigid_solver.forward_kinematics() # no need currently
         self.compute_observations()
 
-        if gs.platform != 'macOS':
+        if gs.platform != "macOS":
             self._render_headless()
         if not self.headless and self.debug:
             self._draw_debug_vis()
@@ -565,11 +634,11 @@ class LocoEnv:
     def compute_observations(self):
         self.obs_buf = torch.cat(
             [
-                self.base_ang_vel * self.obs_scales['ang_vel'],                     # 3
-                self.projected_gravity,                                             # 3
-                self.commands[:, :3] * self.commands_scale,                         # 3
-                (self.dof_pos - self.default_dof_pos) * self.obs_scales['dof_pos'],
-                self.dof_vel * self.obs_scales['dof_vel'],
+                self.base_ang_vel * self.obs_scales["ang_vel"],  # 3
+                self.projected_gravity,  # 3
+                self.commands[:, :3] * self.commands_scale,  # 3
+                (self.dof_pos - self.default_dof_pos) * self.obs_scales["dof_pos"],
+                self.dof_vel * self.obs_scales["dof_vel"],
                 self.actions,
             ],
             axis=-1,
@@ -577,61 +646,65 @@ class LocoEnv:
 
         # add noise
         if not self.eval:
-            self.obs_buf += gs_rand_float(
-                -1.0, 1.0, (self.num_single_obs,), self.device
-            )  * self.obs_noise
+            self.obs_buf += (
+                gs_rand_float(-1.0, 1.0, (self.num_single_obs,), self.device)
+                * self.obs_noise
+            )
 
         clip_obs = 100.0
         self.obs_buf = torch.clip(self.obs_buf, -clip_obs, clip_obs)
 
         self.obs_history_buf = torch.cat(
-            [self.obs_history_buf[:, self.num_single_obs:], self.obs_buf.detach()], dim=1
+            [self.obs_history_buf[:, self.num_single_obs :], self.obs_buf.detach()],
+            dim=1,
         )
 
         if self.num_privileged_obs is not None:
             self.privileged_obs_buf = torch.cat(
                 [
-                    self.base_lin_vel * self.obs_scales['lin_vel'],                     # 3
-                    self.base_ang_vel * self.obs_scales['ang_vel'],                     # 3
-                    self.projected_gravity,                                             # 3
-                    self.commands[:, :3] * self.commands_scale,                         # 3
-                    (self.dof_pos - self.default_dof_pos) * self.obs_scales['dof_pos'],
-                    self.dof_vel * self.obs_scales['dof_vel'],
+                    self.base_lin_vel * self.obs_scales["lin_vel"],  # 3
+                    self.base_ang_vel * self.obs_scales["ang_vel"],  # 3
+                    self.projected_gravity,  # 3
+                    self.commands[:, :3] * self.commands_scale,  # 3
+                    (self.dof_pos - self.default_dof_pos) * self.obs_scales["dof_pos"],
+                    self.dof_vel * self.obs_scales["dof_vel"],
                     self.actions,
                     self.last_actions,
                 ],
                 axis=-1,
             )
-            self.privileged_obs_buf = torch.clip(self.privileged_obs_buf, -clip_obs, clip_obs)
+            self.privileged_obs_buf = torch.clip(
+                self.privileged_obs_buf, -clip_obs, clip_obs
+            )
 
     def _prepare_obs_noise(self):
-        self.obs_noise[:3] = self.obs_cfg['obs_noise']['ang_vel']
-        self.obs_noise[3:6] = self.obs_cfg['obs_noise']['gravity']
-        self.obs_noise[21:33] = self.obs_cfg['obs_noise']['dof_pos']
-        self.obs_noise[33:45] = self.obs_cfg['obs_noise']['dof_vel']
+        self.obs_noise[:3] = self.obs_cfg["obs_noise"]["ang_vel"]
+        self.obs_noise[3:6] = self.obs_cfg["obs_noise"]["gravity"]
+        self.obs_noise[21:33] = self.obs_cfg["obs_noise"]["dof_pos"]
+        self.obs_noise[33:45] = self.obs_cfg["obs_noise"]["dof_vel"]
 
     def _resample_commands(self, envs_idx):
         # resample commands
 
         # lin_vel
         self.commands[envs_idx, 0] = gs_rand_float(
-            *self.command_cfg['lin_vel_x_range'], (len(envs_idx),), self.device
+            *self.command_cfg["lin_vel_x_range"], (len(envs_idx),), self.device
         )
         self.commands[envs_idx, 1] = gs_rand_float(
-            *self.command_cfg['lin_vel_y_range'], (len(envs_idx),), self.device
+            *self.command_cfg["lin_vel_y_range"], (len(envs_idx),), self.device
         )
         self.commands[envs_idx, :2] *= (
             torch.norm(self.commands[envs_idx, :2], dim=1) > 0.2
         ).unsqueeze(1)
 
         # ang_vel
-        if self.command_type == 'heading':
+        if self.command_type == "heading":
             self.commands[envs_idx, 3] = gs_rand_float(
                 -3.14, 3.14, (len(envs_idx),), self.device
             )
-        elif self.command_type == 'ang_vel_yaw':
+        elif self.command_type == "ang_vel_yaw":
             self.commands[envs_idx, 2] = gs_rand_float(
-                *self.command_cfg['ang_vel_range'], (len(envs_idx),), self.device
+                *self.command_cfg["ang_vel_range"], (len(envs_idx),), self.device
             )
             self.commands[envs_idx, 2] *= torch.abs(self.commands[envs_idx, 2]) > 0.2
 
@@ -640,9 +713,9 @@ class LocoEnv:
             return
 
         # reset dofs
-        self.dof_pos[envs_idx] = (
-            self.default_dof_pos
-        )  + gs_rand_float(-0.3, 0.3, (len(envs_idx), self.num_dof), self.device)
+        self.dof_pos[envs_idx] = (self.default_dof_pos) + gs_rand_float(
+            -0.3, 0.3, (len(envs_idx), self.num_dof), self.device
+        )
         self.dof_vel[envs_idx] = 0.0
         self.robot.set_dofs_position(
             position=self.dof_pos[envs_idx],
@@ -657,9 +730,7 @@ class LocoEnv:
             -1.0, 1.0, (len(envs_idx), 2), self.device
         )
         self.base_quat[envs_idx] = self.base_init_quat.reshape(1, -1)
-        base_euler = gs_rand_float(
-            -0.1, 0.1, (len(envs_idx), 3), self.device
-        )
+        base_euler = gs_rand_float(-0.1, 0.1, (len(envs_idx), 3), self.device)
         base_euler[:, 2] = gs_rand_float(0.0, 3.14, (len(envs_idx),), self.device)
         self.base_quat[envs_idx] = gs_quat_mul(
             gs_euler2quat(base_euler),
@@ -707,16 +778,16 @@ class LocoEnv:
         self.reset_buf[envs_idx] = 1
 
         # fill extras
-        self.extras['episode'] = {}
+        self.extras["episode"] = {}
         for key in self.episode_sums.keys():
-            self.extras['episode']['rew_' + key] = (
+            self.extras["episode"]["rew_" + key] = (
                 torch.mean(self.episode_sums[key][envs_idx]).item()
                 / self.max_episode_length_s
             )
             self.episode_sums[key][envs_idx] = 0.0
         # send timeout info to the algorithm
-        if self.env_cfg['send_timeouts']:
-            self.extras['time_outs'] = self.time_out_buf
+        if self.env_cfg["send_timeouts"]:
+            self.extras["time_outs"] = self.time_out_buf
 
     def reset(self):
         self.reset_buf[:] = True
@@ -724,17 +795,17 @@ class LocoEnv:
         return None, None
 
     def step(self, actions):
-        clip_actions = self.env_cfg['clip_actions']
+        clip_actions = self.env_cfg["clip_actions"]
         self.actions = torch.clip(actions, -clip_actions, clip_actions)
         exec_actions = self.last_actions if self.action_latency > 0 else self.actions
         dof_pos_list = []
         dof_vel_list = []
-        if self.env_cfg['use_implicit_controller']:
+        if self.env_cfg["use_implicit_controller"]:
             target_dof_pos = self._compute_target_dof_pos(exec_actions)
             self.robot.control_dofs_position(target_dof_pos, self.motor_dofs)
             self.scene.step()
         else:
-            for i in range(self.env_cfg['decimation']):
+            for i in range(self.env_cfg["decimation"]):
                 self.torques = self._compute_torques(exec_actions)
                 if self.num_build_envs == 0:
                     torques = self.torques.squeeze()
@@ -748,7 +819,7 @@ class LocoEnv:
                 if i == 0 or i == 2:
                     dof_pos_list.append(self.robot.get_dofs_position().detach().cpu())
                     dof_vel_list.append(self.robot.get_dofs_velocity().detach().cpu())
-        
+
         self.dof_pos_list = dof_pos_list
         self.dof_vel_list = dof_vel_list
 
@@ -774,11 +845,11 @@ class LocoEnv:
         elif len(env_ids) == 0:
             return
 
-        if self.env_cfg['randomize_friction']:
+        if self.env_cfg["randomize_friction"]:
             self._randomize_link_friction(env_ids)
-        if self.env_cfg['randomize_base_mass']:
+        if self.env_cfg["randomize_base_mass"]:
             self._randomize_base_mass(env_ids)
-        if self.env_cfg['randomize_com_displacement']:
+        if self.env_cfg["randomize_com_displacement"]:
             self._randomize_com_displacement(env_ids)
 
     def _randomize_controls(self, env_ids=None):
@@ -791,84 +862,118 @@ class LocoEnv:
         elif len(env_ids) == 0:
             return
 
-        if self.env_cfg['randomize_motor_strength']:
+        if self.env_cfg["randomize_motor_strength"]:
             self._randomize_motor_strength(env_ids)
-        if self.env_cfg['randomize_motor_offset']:
+        if self.env_cfg["randomize_motor_offset"]:
             self._randomize_motor_offset(env_ids)
-        if self.env_cfg['randomize_kp_scale']:
+        if self.env_cfg["randomize_kp_scale"]:
             self._randomize_kp(env_ids)
-        if self.env_cfg['randomize_kd_scale']:
+        if self.env_cfg["randomize_kd_scale"]:
             self._randomize_kd(env_ids)
 
     def _randomize_link_friction(self, env_ids):
 
-        min_friction, max_friction = self.env_cfg['friction_range']
+        min_friction, max_friction = self.env_cfg["friction_range"]
 
         solver = self.rigid_solver
 
-        ratios = gs.rand((len(env_ids), 1), dtype=float).repeat(1, solver.n_geoms) \
-                 * (max_friction - min_friction) + min_friction
-        solver.set_geoms_friction_ratio(ratios, torch.arange(0, solver.n_geoms), env_ids)
+        ratios = (
+            gs.rand((len(env_ids), 1), dtype=float).repeat(1, solver.n_geoms)
+            * (max_friction - min_friction)
+            + min_friction
+        )
+        solver.set_geoms_friction_ratio(
+            ratios, torch.arange(0, solver.n_geoms), env_ids
+        )
 
     def _randomize_base_mass(self, env_ids):
 
-        min_mass, max_mass = self.env_cfg['added_mass_range']
+        min_mass, max_mass = self.env_cfg["added_mass_range"]
         base_link_id = 1
 
-        added_mass = gs.rand((len(env_ids), 1), dtype=float) \
-                        * (max_mass - min_mass) + min_mass
+        added_mass = (
+            gs.rand((len(env_ids), 1), dtype=float) * (max_mass - min_mass) + min_mass
+        )
 
-        self.rigid_solver.set_links_mass_shift(added_mass, [base_link_id,], env_ids)
+        self.rigid_solver.set_links_mass_shift(
+            added_mass,
+            [
+                base_link_id,
+            ],
+            env_ids,
+        )
 
     def _randomize_com_displacement(self, env_ids):
 
-        min_displacement, max_displacement = self.env_cfg['com_displacement_range']
+        min_displacement, max_displacement = self.env_cfg["com_displacement_range"]
         base_link_id = 1
 
-        com_displacement = gs.rand((len(env_ids), 1, 3), dtype=float) \
-                            * (max_displacement - min_displacement) + min_displacement
+        com_displacement = (
+            gs.rand((len(env_ids), 1, 3), dtype=float)
+            * (max_displacement - min_displacement)
+            + min_displacement
+        )
         # com_displacement[:, :, 0] -= 0.02
 
-        self.rigid_solver.set_links_COM_shift(com_displacement, [base_link_id,], env_ids)
+        self.rigid_solver.set_links_COM_shift(
+            com_displacement,
+            [
+                base_link_id,
+            ],
+            env_ids,
+        )
 
     def _randomize_motor_strength(self, env_ids):
 
-        min_strength, max_strength = self.env_cfg['motor_strength_range']
-        self.motor_strengths[env_ids, :] = gs.rand((len(env_ids), 1), dtype=float) \
-                                           * (max_strength - min_strength) + min_strength
+        min_strength, max_strength = self.env_cfg["motor_strength_range"]
+        self.motor_strengths[env_ids, :] = (
+            gs.rand((len(env_ids), 1), dtype=float) * (max_strength - min_strength)
+            + min_strength
+        )
 
     def _randomize_motor_offset(self, env_ids):
 
-        min_offset, max_offset = self.env_cfg['motor_offset_range']
-        self.motor_offsets[env_ids, :] = gs.rand((len(env_ids), self.num_dof), dtype=float) \
-                                         * (max_offset - min_offset) + min_offset
+        min_offset, max_offset = self.env_cfg["motor_offset_range"]
+        self.motor_offsets[env_ids, :] = (
+            gs.rand((len(env_ids), self.num_dof), dtype=float)
+            * (max_offset - min_offset)
+            + min_offset
+        )
 
     def _randomize_kp(self, env_ids):
 
-        min_scale, max_scale = self.env_cfg['kp_scale_range']
-        kp_scales = gs.rand((len(env_ids), self.num_dof), dtype=float) \
-                    * (max_scale - min_scale) + min_scale
+        min_scale, max_scale = self.env_cfg["kp_scale_range"]
+        kp_scales = (
+            gs.rand((len(env_ids), self.num_dof), dtype=float) * (max_scale - min_scale)
+            + min_scale
+        )
         self.batched_p_gains[env_ids, :] = kp_scales * self.p_gains[None, :]
 
     def _randomize_kd(self, env_ids):
 
-        min_scale, max_scale = self.env_cfg['kd_scale_range']
-        kd_scales = gs.rand((len(env_ids), self.num_dof), dtype=float) \
-                    * (max_scale - min_scale) + min_scale
+        min_scale, max_scale = self.env_cfg["kd_scale_range"]
+        kd_scales = (
+            gs.rand((len(env_ids), self.num_dof), dtype=float) * (max_scale - min_scale)
+            + min_scale
+        )
         self.batched_d_gains[env_ids, :] = kd_scales * self.d_gains[None, :]
 
     def _draw_debug_vis(self):
-        ''' Draws visualizations for dubugging (slows down simulation a lot).
-            Default behaviour: draws height measurement points
-        '''
+        """Draws visualizations for dubugging (slows down simulation a lot).
+        Default behaviour: draws height measurement points
+        """
         self.scene.clear_debug_objects()
 
         foot_poss = self.foot_positions[0].reshape(-1, 3)
         # self.scene.draw_debug_spheres(poss=foot_poss, radius=0.03, color=(1, 0, 0, 0.7))
 
         foot_poss = foot_poss.cpu()
-        self.scene.draw_debug_line(foot_poss[0], foot_poss[3], radius=0.002, color=(1, 0, 0, 0.7))
-        self.scene.draw_debug_line(foot_poss[1], foot_poss[2], radius=0.002, color=(1, 0, 0, 0.7))
+        self.scene.draw_debug_line(
+            foot_poss[0], foot_poss[3], radius=0.002, color=(1, 0, 0, 0.7)
+        )
+        self.scene.draw_debug_line(
+            foot_poss[1], foot_poss[2], radius=0.002, color=(1, 0, 0, 0.7)
+        )
 
         com = self.com[0]
         # self.scene.draw_debug_sphere(pos=com, radius=0.1, color=(0, 0, 1, 0.7))
@@ -877,8 +982,7 @@ class LocoEnv:
         self.scene.draw_debug_sphere(pos=com, radius=0.02, color=(0, 0, 1, 0.7))
 
     def _set_camera(self):
-        ''' Set camera position and direction
-        '''
+        """Set camera position and direction"""
         self._floating_camera = self.scene.add_camera(
             pos=np.array([0, -1, 1]),
             lookat=np.array([0, 0, 0]),
@@ -893,7 +997,10 @@ class LocoEnv:
     def _render_headless(self):
         if self._recording and len(self._recorded_frames) < 150:
             robot_pos = np.array(self.base_pos[0].cpu())
-            self._floating_camera.set_pose(pos=robot_pos + np.array([-1, -1, 0.5]), lookat=robot_pos + np.array([0, 0, -0.1]))
+            self._floating_camera.set_pose(
+                pos=robot_pos + np.array([-1, -1, 0.5]),
+                lookat=robot_pos + np.array([0, 0, -0.1]),
+            )
             # import time
             # start = time.time()
             frame, _, _, _ = self._floating_camera.render()
@@ -927,4 +1034,4 @@ class LocoEnv:
         self._recording = False
         if save_path is not None:
             print("fps", int(1 / self.dt))
-            self._floating_camera.stop_recording(save_path, fps = int(1 / self.dt))
+            self._floating_camera.stop_recording(save_path, fps=int(1 / self.dt))
