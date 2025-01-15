@@ -114,7 +114,7 @@ def get_cfgs():
         "termination_if_pitch_greater_than": 0.4,
         "termination_if_height_lower_than": 0.0,
         # base pose
-        "base_init_pos": [12.0, 12.0, 0.42], # use 12 if using terrain
+        "base_init_pos": [12.0, 12.0, 0.42],  # use 12 if using terrain
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
         # random push
         "push_interval_s": -1,
@@ -135,7 +135,7 @@ def get_cfgs():
             "vertical_scale": 0.005,
             "horizontal_scale": 0.25,
             "n_subterrains": (2, 2),
-            'subterrain_size': (12, 12), 
+            "subterrain_size": (12, 12),
             "subterrain_types": [
                 ["flat_terrain", "random_uniform_terrain"],
                 ["pyramid_sloped_terrain", "discrete_obstacles_terrain"],
@@ -187,7 +187,7 @@ def get_cfgs():
             "ang_vel_xy": -0.05,
             "orientation": -10.0,
             "base_height": -50.0,
-            "torques": -0.0002,
+            # "torques": -0.0002,
             "collision": -1.0,
             "dof_vel": -0.0,
             "dof_acc": -2.5e-7,
@@ -249,7 +249,10 @@ def main():
         debug=args.debug,
     )
 
-    runner = OnPolicyRunner(env, get_train_cfg(args), log_dir, device="cuda:0")
+    print("SUBSTEPS: ", env.scene.substeps)
+
+    train_cfg = get_train_cfg(args)
+    runner = OnPolicyRunner(env, train_cfg, log_dir, device="cuda:0")
 
     if args.resume is not None:
         resume_dir = f"logs/{args.resume}"
@@ -262,6 +265,14 @@ def main():
         name=args.exp_name,
         dir=log_dir,
         mode="offline" if args.offline else "online",
+        config={
+            "num_envs": args.num_envs,
+            "train_cfg": train_cfg,
+            "env_cfg": env_cfg,
+            "obs_cfg": obs_cfg,
+            "reward_cfg": reward_cfg,
+            "command_cfg": command_cfg,
+        },
     )
 
     pickle.dump(
