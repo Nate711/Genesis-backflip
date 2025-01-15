@@ -108,13 +108,13 @@ def get_cfgs():
         # PD
         "PD_stiffness": {"joint": 30.0},
         "PD_damping": {"joint": 1.5},
-        "use_implicit_controller": False,
+        "use_implicit_controller": True,
         # termination
         "termination_if_roll_greater_than": 0.4,
         "termination_if_pitch_greater_than": 0.4,
         "termination_if_height_lower_than": 0.0,
         # base pose
-        "base_init_pos": [0.0, 0.0, 0.42],
+        "base_init_pos": [12.0, 12.0, 0.42], # use 12 if using terrain
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
         # random push
         "push_interval_s": -1,
@@ -128,7 +128,7 @@ def get_cfgs():
         "clip_actions": 100.0,
         "send_timeouts": True,
         "control_freq": 50,
-        "decimation": 4,
+        "decimation": 5,
         "feet_geom_offset": 1,
         "use_terrain": True,
         "terrain_cfg": {
