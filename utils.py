@@ -129,7 +129,7 @@ def gs_quat_apply(a, b):
 
 def gs_quat_apply_yaw(quat, vec):
     quat_yaw = quat.clone().view(-1, 4)
-    quat_yaw[:, 1:3] = 0.
+    quat_yaw[:, 1:3] = 0.0
     quat_yaw = normalize(quat_yaw)
     return gs_quat_apply(quat_yaw, vec)
 
@@ -137,4 +137,10 @@ def gs_quat_apply_yaw(quat, vec):
 def gs_quat_conjugate(a):
     shape = a.shape
     a = a.reshape(-1, 4)
-    return torch.cat((a[:, :1], -a[:, 1:], ), dim=-1).view(shape)
+    return torch.cat(
+        (
+            a[:, :1],
+            -a[:, 1:],
+        ),
+        dim=-1,
+    ).view(shape)
