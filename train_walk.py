@@ -110,8 +110,8 @@ def get_cfgs():
         "PD_damping": {"joint": 1.5},
         "use_implicit_controller": True,
         # termination
-        "termination_if_roll_greater_than": 1.2,
-        "termination_if_pitch_greater_than": 1.2,
+        "termination_if_roll_greater_than": 0.4,
+        "termination_if_pitch_greater_than": 0.4,
         "termination_if_height_lower_than": 0.0,
         # base pose
         "base_init_pos": [12.0, 12.0, 0.42],  # use 12 if using terrain
@@ -123,7 +123,7 @@ def get_cfgs():
         "episode_length_s": 20.0,
         "resampling_time_s": 4.0,
         "command_type": "ang_vel_yaw",  # 'ang_vel_yaw' or 'heading'
-        "action_scale": 1.5,
+        "action_scale": 0.25,
         "action_latency": 0.02,
         "clip_actions": 100.0,
         "send_timeouts": True,
@@ -219,6 +219,7 @@ def main():
     parser.add_argument("--eval", action="store_true", default=False)
     parser.add_argument("--debug", action="store_true", default=False)
     parser.add_argument("--ckpt", type=int, default=1000)
+    parser.add_argument("--device", type=str, default="cuda:0")
     args = parser.parse_args()
 
     if args.debug:
@@ -247,6 +248,7 @@ def main():
         show_viewer=args.vis,
         eval=args.eval,
         debug=args.debug,
+        device=args.device,
     )
 
     print("SUBSTEPS: ", env.scene.substeps)
@@ -280,9 +282,7 @@ def main():
         open(f"{log_dir}/cfgs.pkl", "wb"),
     )
 
-    runner.learn(
-        num_learning_iterations=args.max_iterations, init_at_random_ep_len=True
-    )
+    runner.learn(num_learning_iterations=args.max_iterations, init_at_random_ep_len=True)
 
 
 if __name__ == "__main__":
