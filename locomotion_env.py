@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import gym
 
 import genesis as gs
 from genesis.engine.solvers.rigid.rigid_solver_decomp import RigidSolver
