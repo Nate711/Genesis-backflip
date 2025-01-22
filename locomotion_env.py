@@ -859,9 +859,6 @@ class LocoEnv:
         kp_scales = (
             gs.rand((len(env_ids), self.num_dof), dtype=float) * (max_scale - min_scale) + min_scale
         )
-        import ipdb
-
-        ipdb.set_trace()
         self.batched_p_gains[env_ids, :] = kp_scales * self.p_gains[None, :]
 
     def _randomize_kd(self, env_ids):
