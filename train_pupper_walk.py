@@ -118,7 +118,7 @@ def get_cfgs():
         "base_init_pos": [
             12.0,
             12.0,
-            0.18,
+            0.42,
         ],  # use 12 if using terrain. 0.42m is high right?
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
         # random push
