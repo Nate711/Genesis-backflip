@@ -1,17 +1,13 @@
 import argparse
-import copy
 import os
 import pickle
-import shutil
 
-import numpy as np
-import torch
 import wandb
 from reward_wrapper import Go2
-from locomotion_env import LocoEnv
 from rsl_rl.runners import OnPolicyRunner
 
 import genesis as gs
+import re
 
 
 def get_train_cfg(args):
@@ -118,7 +114,7 @@ def get_cfgs():
         "base_init_pos": [
             12.0,
             12.0,
-            0.42,
+            0.24,
         ],  # use 12 if using terrain. 0.42m is high right?
         "base_init_quat": [1.0, 0.0, 0.0, 0.0],
         # random push
@@ -191,7 +187,7 @@ def get_cfgs():
             "lin_vel_z": -2.0,
             "ang_vel_xy": -0.05,
             "orientation": -10.0,
-            "base_height": -50.0,
+            "base_height": -5.0,
             # "torques": -0.0002,
             "collision": -1.0,
             "dof_vel": -0.0,
@@ -199,7 +195,7 @@ def get_cfgs():
             "feet_air_time": 1.0,
             "collision": -1.0,
             "action_rate": -0.01,
-            "termination": -100.0,
+            "termination": -200.0,
         },
     }
     command_cfg = {
@@ -212,9 +208,36 @@ def get_cfgs():
     return env_cfg, obs_cfg, reward_cfg, command_cfg
 
 
+def create_log_dir(exp_name: str):
+    # Intelligently create log dir
+    log_dir = f"logs/{exp_name}"
+    if os.path.exists(log_dir):
+        gs.logger.warning(
+            f"Log directory {log_dir} already exists... Increasing number"
+        )
+
+        # Regular expression to check if log_dir ends in a number
+        match = re.search(r"(.*?)(\d+)$", log_dir)
+
+        if match:
+            # If there's a match, increment the number
+            base, num = match.groups()
+            new_num = int(num) + 1
+            log_dir = f"{base}{new_num}"
+        else:
+            # Otherwise, append "_1"
+            log_dir = f"{log_dir}_1"
+
+    gs.logger.info(f"New log directory is {log_dir}")
+    os.makedirs(log_dir, exist_ok=True)
+    return log_dir
+
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-e", "--exp_name", type=str, default="Go2")
+    parser.add_argument(
+        "-e", "--exp_name", type=str, required=True, default="PupperV3Walk"
+    )
     parser.add_argument("-v", "--vis", action="store_true", default=False)
     parser.add_argument("-c", "--cpu", action="store_true", default=False)
     parser.add_argument("-B", "--num_envs", type=int, default=10000)
@@ -238,36 +261,10 @@ def main():
         logging_level="warning",
     )
 
-    log_dir = f"logs/{args.exp_name}"
     env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
-
-    if os.path.exists(log_dir):
-        shutil.rmtree(log_dir)
-    os.makedirs(log_dir, exist_ok=True)
-
-    env = Go2(
-        num_envs=args.num_envs,
-        env_cfg=env_cfg,
-        obs_cfg=obs_cfg,
-        reward_cfg=reward_cfg,
-        command_cfg=command_cfg,
-        show_viewer=args.vis,
-        eval=args.eval,
-        debug=args.debug,
-        device=args.device,
-    )
-
-    print("SUBSTEPS: ", env.scene.substeps)
-
     train_cfg = get_train_cfg(args)
-    runner = OnPolicyRunner(env, train_cfg, log_dir, device="cuda:0")
 
-    if args.resume is not None:
-        resume_dir = f"logs/{args.resume}"
-        resume_path = os.path.join(resume_dir, f"model_{args.ckpt}.pt")
-        print("==> resume training from", resume_path)
-        runner.load(resume_path)
-
+    log_dir = create_log_dir(args.exp_name)
     wandb.init(
         project="genesis",
         name=args.exp_name,
@@ -283,12 +280,34 @@ def main():
         },
     )
 
+    env = Go2(
+        num_envs=args.num_envs,
+        env_cfg=env_cfg,
+        obs_cfg=obs_cfg,
+        reward_cfg=reward_cfg,
+        command_cfg=command_cfg,
+        show_viewer=args.vis,
+        eval=args.eval,
+        debug=args.debug,
+        device=args.device,
+    )
+
+    gs.logger.warning(f"SUBSTEPS: {env.scene.substeps}")
+
+    runner = OnPolicyRunner(env, train_cfg, log_dir, device=args.device)
+
+    if args.resume is not None:
+        resume_dir = f"logs/{args.resume}"
+        resume_path = os.path.join(resume_dir, f"model_{args.ckpt}.pt")
+        gs.logger.warning(f"==> resume training from  {resume_path}")
+        runner.load(resume_path)
+
     pickle.dump(
         [env_cfg, obs_cfg, reward_cfg, command_cfg],
         open(f"{log_dir}/cfgs.pkl", "wb"),
     )
 
-    # BUG: runner.learn calls get_observations and it returns zeros
+    # BUG: runner.learn calls get_observations and it returns zeros at the first step
     runner.learn(
         num_learning_iterations=args.max_iterations, init_at_random_ep_len=True
     )
