@@ -15,6 +15,7 @@ args = parser.parse_args()
 VIS = args.vis
 USE_TERRAIN = args.use_terrain
 N_ENVS = args.n_envs
+DT = 0.004
 
 
 def small_quaternions(batch_size=8, max_angle_deg=30, max_yaw_deg=180):
@@ -85,11 +86,11 @@ scene = gs.Scene(
         n_rendered_envs=min(N_ENVS, 100),
     ),
     sim_options=gs.options.SimOptions(
-        dt=0.02,
-        substeps=2,
+        dt=DT,
+        substeps=1,
     ),
     rigid_options=gs.options.RigidOptions(
-        dt=0.02,
+        dt=DT,
         constraint_solver=gs.constraint_solver.Newton,
         enable_collision=True,
         enable_self_collision=True,
