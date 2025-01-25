@@ -1,5 +1,6 @@
 import argparse
 import os
+import pathlib
 import pickle
 
 import wandb
@@ -129,7 +130,7 @@ def get_cfgs():
         "clip_actions": 100.0,
         "send_timeouts": True,
         "control_freq": 50,
-        "decimation": 20,
+        "decimation": 2,
         "feet_geom_offset": 1,
         "use_terrain": True,
         "terrain_cfg": {
@@ -208,25 +209,15 @@ def get_cfgs():
     return env_cfg, obs_cfg, reward_cfg, command_cfg
 
 
-def create_log_dir(exp_name: str):
+def create_log_dir(logs_dir: pathlib.Path, exp_name: str):
+    logs_dir = pathlib.Path(logs_dir)
     # Intelligently create log dir
-    log_dir = f"logs/{exp_name}"
-    if os.path.exists(log_dir):
-        gs.logger.warning(
-            f"Log directory {log_dir} already exists... Increasing number"
-        )
+    log_dir = logs_dir / pathlib.Path(exp_name)
 
-        # Regular expression to check if log_dir ends in a number
-        match = re.search(r"(.*?)(\d+)$", log_dir)
-
-        if match:
-            # If there's a match, increment the number
-            base, num = match.groups()
-            new_num = int(num) + 1
-            log_dir = f"{base}{new_num}"
-        else:
-            # Otherwise, append "_1"
-            log_dir = f"{log_dir}_1"
+    exp_number = 0
+    while log_dir.exists():
+        exp_number += 1
+        log_dir = logs_dir / pathlib.Path(f"{exp_name}-{exp_number}")
 
     gs.logger.info(f"New log directory is {log_dir}")
     os.makedirs(log_dir, exist_ok=True)
@@ -264,7 +255,7 @@ def main():
     env_cfg, obs_cfg, reward_cfg, command_cfg = get_cfgs()
     train_cfg = get_train_cfg(args)
 
-    log_dir = create_log_dir(args.exp_name)
+    log_dir = create_log_dir(pathlib.Path("logs"), args.exp_name)
     wandb.init(
         project="genesis",
         name=args.exp_name,

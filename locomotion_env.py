@@ -599,6 +599,8 @@ class LocoEnv:
             .nonzero(as_tuple=False)
             .flatten()
         )
+        if len(envs_idx) > 0:
+            gs.logger.warning(f"resample/randomize envs_idx: {envs_idx}")
         self._resample_commands(envs_idx)
         self._randomize_rigids(envs_idx)
         self._randomize_controls(envs_idx)
@@ -631,9 +633,12 @@ class LocoEnv:
 
         self.check_termination()
         self.compute_reward()
-
         envs_idx = self.reset_buf.nonzero(as_tuple=False).flatten()
         if self.num_build_envs > 0:
+            if len(envs_idx) > 0:
+                gs.logger.warning(
+                    f"**************** resetting envs {envs_idx} ***********************"
+                )
             self.reset_idx(envs_idx)
         # self.rigid_solver.forward_kinematics() # no need currently
         self.compute_observations()
@@ -641,7 +646,9 @@ class LocoEnv:
         if gs.platform != "macOS":
             self._render_headless()
         if not self.headless and self.debug:
-            self._draw_debug_vis()
+            # ran into some problem here?
+            # self._draw_debug_vis()
+            pass
 
         self.last_actions[:] = self.actions[:]
         self.last_last_actions[:] = self.last_actions[:]
@@ -826,6 +833,10 @@ class LocoEnv:
             target_dof_pos = self._compute_target_dof_pos(exec_actions)
             self.robot.control_dofs_position(target_dof_pos, self.motor_dofs)
             self.scene.step()
+            if self.robot.get_qpos().isnan().any():
+                import ipdb
+
+                ipdb.set_trace()
         else:
             for i in range(self.env_cfg["decimation"]):
                 self.torques = self._compute_torques(exec_actions)
@@ -846,6 +857,10 @@ class LocoEnv:
         self.dof_vel_list = dof_vel_list
 
         self.post_physics_step()
+
+        print(
+            f"Step: {self.common_step_counter}, Episode Length: {self.episode_length_buf.item()}"
+        )
 
         if torch.isnan(self.obs_history_buf).any():
             import ipdb
