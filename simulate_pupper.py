@@ -5,6 +5,7 @@ import genesis as gs
 import torch
 import argparse
 from collections import deque
+import requests
 
 parser = argparse.ArgumentParser(description="Simulate Pupper")
 parser.add_argument("--vis", action="store_true", help="Enable visualization")
@@ -18,8 +19,8 @@ VIS = args.vis
 USE_TERRAIN = args.use_terrain
 N_ENVS = args.n_envs
 DT = 0.02
-SUBSTEPS = 5
-RESET_STEPS = 50
+SUBSTEPS = 50  # still get flying away Puppers with dt=0.02 and substeps=50. Using dt=0.02/50 and substeps=1 still doosn't help
+RESET_STEPS = int(1.0 / DT)
 
 
 def small_quaternions(batch_size=8, max_angle_deg=30, max_yaw_deg=180):
@@ -94,7 +95,7 @@ scene = gs.Scene(
         substeps=SUBSTEPS,
     ),
     rigid_options=gs.options.RigidOptions(
-        integrator=gs.integrator.implicitfast,
+        # integrator=gs.integrator.implicitfast,
         dt=DT,
         constraint_solver=gs.constraint_solver.Newton,
         enable_collision=True,
@@ -118,9 +119,19 @@ if args.go2:
         vis_mode="collision",
     )
 else:
+    url = (
+        "https://raw.githubusercontent.com/Nate711/pupperv3-monorepo/"
+        "refs/heads/main/ros2_ws/src/pupper_v3_description/description/"
+        "mujoco_xml/pupper_v3_complete.position.full_collision.no_visual.xml"
+    )
+    response = requests.get(url)
+
+    with open("model.xml", "wb") as file:
+        file.write(response.content)
+
     pupper = scene.add_entity(
         gs.morphs.MJCF(
-            file="/home/nathankau/pupperv3/ros2_ws/src/pupper_v3_description/description/mujoco_xml/pupper_v3_complete.position.full_collision.xml",
+            file="model.xml",
         ),
         vis_mode="collision",
     )
@@ -313,6 +324,10 @@ while True:
     isnans = torch.isnan(pupper.get_pos())
     if isnans.any():
         import ipdb
+
+        # convert pos_history and vel_history from collections.deque to lists
+        pos_history = list(pos_history)
+        vel_history = list(vel_history)
 
         pos_tensor = torch.stack(pos_history)
         print(pos_tensor[:, isnans.nonzero()[0, 0], :])
