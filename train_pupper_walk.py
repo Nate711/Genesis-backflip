@@ -60,7 +60,7 @@ def get_train_cfg(args):
 
 def get_cfgs():
     env_cfg = {
-        "urdf_path": "/home/nathankau/pupperv3/ros2_ws/src/pupper_v3_description/description/mujoco_xml/pupper_v3_complete.position.full_collision.xml",
+        "urdf_path": "/home/nathankau/pupperv3-monorepo/ros2_ws/src/pupper_v3_description/description/mujoco_xml/pupper_v3_complete.position.full_collision.xml",
         # "urdf_path": "urdf/go2/urdf/go2.urdf",
         "links_to_keep": [
             # "FL_foot",
